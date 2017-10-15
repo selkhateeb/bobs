@@ -1,0 +1,73 @@
+#! /usr/bin/env python3
+
+import sys
+import os
+import inspect
+
+def find_root_dir():
+    root_dir = os.getcwd()
+    while not os.path.exists(os.path.join(root_dir, 'bobs')):
+        root_dir = os.path.dirname(root_dir)
+        if root_dir == '/':
+            raise Exception('Not a bobs project.')
+    return root_dir
+
+
+sys.path.append(os.path.join(find_root_dir(), '.bobby', 'src'))
+
+from bobby import Task, Tool
+
+from importlib.machinery import SourceFileLoader
+loader = SourceFileLoader('build', './bob.py')
+handle = loader.load_module('build')
+
+
+def find_all_tasks_for(module, task_name=None):
+    tasks = []
+    for name, obj in inspect.getmembers(module):
+        if inspect.isclass(obj) and issubclass(obj, Task) and (obj is not Task):
+            tasks.append(obj)
+            if task_name.lower() == obj.__name__.lower():
+                return obj
+
+    return tasks
+
+
+def run_task(task):
+    task().run()
+
+
+def manageTool(tool):
+    instance = tool()
+    if hasattr(instance, 'dependsOn'):
+        t = manageTool(instance.dependsOn)
+        setattr(instance, t.__class__.__name__.lower(), t)
+
+    if hasattr(instance, 'is_downloaded') and not instance.is_downloaded():
+        print('downloading %s' % tool.__name__)
+        instance.download()
+
+    if not instance.is_installed():
+        print('installing %s' % tool.__name__)
+        instance.install()
+
+    return instance
+
+
+def manageTask(task):
+    instance = task()
+    if hasattr(instance, 'dependsOn'):
+        for dep in instance.dependsOn:
+            manageTask(dep)
+
+    if hasattr(instance, 'tool'):
+        tool = manageTool(instance.tool)
+        setattr(instance, tool.__class__.__name__.lower(), tool)
+
+    uptodate = hasattr(instance, 'is_uptodate') and instance.is_uptodate()
+    print('%s: up to date? %s' % (task.__name__, uptodate))
+    if not uptodate and hasattr(instance, 'run'):
+        instance.run()
+
+
+manageTask(find_all_tasks_for(handle, 'build'))
