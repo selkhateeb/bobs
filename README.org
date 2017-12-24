@@ -1,0 +1,9 @@
+
+* Introduction
+  This is yet another build tool. The idea of this tool is to be a generic
+  language agnostic build and task runner system with zero dependencies other
+  that an operating system and a bash shell.
+
+  Basically start by defining a tool, which defines how it gets installed and
+  used. Then define a task that uses this tool to run.
+
